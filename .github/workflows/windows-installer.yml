@@ -23,7 +23,7 @@ jobs:
     # Only the public sibling repo runs CI, so the private project repo
     # never spends Actions minutes on pushes.
     if: github.repository == 'scx1332/torus-racer-build'
-    timeout-minutes: 30
+    timeout-minutes: 45
     defaults:
       run:
         shell: pwsh
@@ -85,7 +85,9 @@ jobs:
         run: mise run build-installer
 
       - name: Test install, launch and uninstall
-        timeout-minutes: 5
+        # A backstop only. The script bounds msiexec and the game launch itself,
+        # because a step timeout cannot be relied on to kill a stuck process tree.
+        timeout-minutes: 20
         run: ./tools/test_windows_installer.ps1
 
       - name: Upload MSI

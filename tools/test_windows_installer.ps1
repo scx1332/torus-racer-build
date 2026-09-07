@@ -1,6 +1,7 @@
 #requires -Version 7.2
 # Destructive install/uninstall smoke test: only a disposable GitHub-hosted Windows runner.
-# The workflow must bound this step with timeout-minutes; msiexec has no timeout switch.
+# Every child process is bounded here rather than by the workflow alone: a step
+# timeout does not reliably kill a process tree that still holds the output pipes.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -31,6 +32,35 @@ $gameLog = Join-Path $logDirectory 'game.log'
 $uninstallLog = Join-Path $logDirectory 'uninstall.log'
 $msiexecPath = Join-Path ([Environment]::GetFolderPath('System')) 'msiexec.exe'
 
+function Start-BoundedProcess {
+    param(
+        [string] $FilePath,
+        [string] $ArgumentList,
+        [string] $WorkingDirectory,
+        [int] $TimeoutSeconds,
+        [string] $Description
+    )
+
+    $parameters = @{ FilePath = $FilePath; ArgumentList = $ArgumentList; PassThru = $true }
+    if ($WorkingDirectory) {
+        $parameters['WorkingDirectory'] = $WorkingDirectory
+    }
+    # Deliberately not -Wait: that also waits for descendants, and the msiexec
+    # service lingers for minutes after an install, which hangs the whole step.
+    # WaitForExit waits for this process only and takes a timeout.
+    $process = Start-Process @parameters
+    if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+        try {
+            $process.Kill($true)
+        }
+        catch {
+            Write-Warning "Could not kill the timed-out process: $($_.Exception.Message)"
+        }
+        throw "$Description did not finish within $TimeoutSeconds seconds."
+    }
+    return $process.ExitCode
+}
+
 function Invoke-TestMsi {
     param(
         [ValidateSet('/i', '/x')][string] $Operation,
@@ -39,11 +69,12 @@ function Invoke-TestMsi {
 
     # ArgumentList is one explicitly quoted Windows command line, including paths with spaces.
     $arguments = '{0} "{1}" /qn /norestart /L*v "{2}"' -f $Operation, $msiPath, $LogPath
-    $process = Start-Process -FilePath $msiexecPath -ArgumentList $arguments -Wait -PassThru
-    if ($process.ExitCode -notin @(0, 3010)) {
-        throw "msiexec $Operation failed with exit code $($process.ExitCode). See $LogPath"
+    $exitCode = Start-BoundedProcess -FilePath $msiexecPath -ArgumentList $arguments `
+        -TimeoutSeconds 300 -Description "msiexec $Operation"
+    if ($exitCode -notin @(0, 3010)) {
+        throw "msiexec $Operation failed with exit code $exitCode. See $LogPath"
     }
-    Write-Host "msiexec $Operation completed with exit code $($process.ExitCode)."
+    Write-Host "msiexec $Operation completed with exit code $exitCode."
 }
 
 $installationAttempted = $false
@@ -60,10 +91,10 @@ try {
     # Launch from the installed directory, so the repository cannot supply missing resources.
     # The real game may read its normal user data; this test creates no fake lap records.
     $gameArguments = '--headless --log-file "{0}" --quit-after 120' -f $gameLog
-    $game = Start-Process -FilePath $executablePath -ArgumentList $gameArguments `
-        -WorkingDirectory $installDirectory -Wait -PassThru
-    if ($game.ExitCode -ne 0) {
-        throw "The installed game exited with code $($game.ExitCode). See $gameLog"
+    $gameExitCode = Start-BoundedProcess -FilePath $executablePath -ArgumentList $gameArguments `
+        -WorkingDirectory $installDirectory -TimeoutSeconds 180 -Description 'The installed game'
+    if ($gameExitCode -ne 0) {
+        throw "The installed game exited with code $gameExitCode. See $gameLog"
     }
     if (-not (Test-Path -LiteralPath $gameLog -PathType Leaf)) {
         throw "The installed game did not produce its requested log: $gameLog"
