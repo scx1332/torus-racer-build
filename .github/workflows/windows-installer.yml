@@ -20,6 +20,9 @@ concurrency:
 jobs:
   build:
     runs-on: windows-2025
+    # Only the public sibling repo runs CI, so the private project repo
+    # never spends Actions minutes on pushes.
+    if: github.repository == 'scx1332/torus-racer-build'
     timeout-minutes: 30
     defaults:
       run:

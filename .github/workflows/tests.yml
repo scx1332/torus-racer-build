@@ -1,0 +1,61 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Headless validation
+    # Only the public sibling repo runs CI, so the private project repo
+    # never spends Actions minutes on pushes.
+    if: github.repository == 'scx1332/torus-racer-build'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # Keep aligned with mise.toml; the version check below rejects drift.
+      GODOT_VERSION: "4.7.2"
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install runtime libraries
+        # The stock Godot Linux build links against X11, GL and ALSA even when
+        # it runs headless with the dummy display and audio drivers.
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libasound2t64 libgl1 libxcursor1 libxi6 libxinerama1 libxrandr2
+
+      - name: Install Godot with mise
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: "2026.9.1"
+          install_args: godot
+
+      - name: Check tool versions
+        run: |
+          godot_version="$(mise exec -- godot --version)"
+          case "$godot_version" in
+            "$GODOT_VERSION".stable.*) ;;
+            *) echo "Godot does not match mise.toml: $godot_version" >&2; exit 1 ;;
+          esac
+          echo "Godot: $godot_version"
+
+      - name: Import project and run the full suite
+        # mise stops at the first failing command, and every test script exits
+        # non-zero when a check fails.
+        run: mise run validate
