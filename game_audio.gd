@@ -6,19 +6,13 @@ signal cue_played(kind: StringName)
 
 @export var target: TorusBody
 @export var water_hazard: Node3D
-@export var music_enabled: bool = true:
-	set(value):
-		music_enabled = value
-		_sync_music()
 @export var sfx_enabled: bool = true:
 	set(value):
 		sfx_enabled = value
 		if not value:
 			_stop_effects()
-@export_range(-40.0, 0.0, 1.0) var music_volume_db: float = -20.0
 @export_range(-40.0, 0.0, 1.0) var sfx_volume_db: float = -10.0
 
-var _music: AudioStreamPlayer
 var _rolling: AudioStreamPlayer
 var _effects: Dictionary = {}
 var _sample: Dictionary = {}
@@ -33,13 +27,10 @@ var _water_reset_pending: bool = false
 
 
 func _ready() -> void:
-	_install_input()
-	_music = _player("CoastalMusic", AudioSynth.music())
 	_rolling = _player("Rolling", AudioSynth.rolling())
 	_rolling.volume_db = -60.0
 	for kind: StringName in [&"hop", &"landing", &"impact", &"splash"]:
 		_effects[kind] = _player(String(kind).capitalize(), AudioSynth.cue(kind))
-	_sync_music()
 	if is_instance_valid(target):
 		target.physics_sampled.connect(_on_physics_sampled)
 		target.reset_completed.connect(_on_reset)
@@ -47,14 +38,7 @@ func _ready() -> void:
 		water_hazard.connect(&"water_entered", _on_water_entered)
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"music_toggle") and not event.is_echo():
-		music_enabled = not music_enabled
-		get_viewport().set_input_as_handled()
-
-
 func _process(delta: float) -> void:
-	_sync_music()
 	if not sfx_enabled or _submerged or _sample.is_empty() or _sample.get("water_pending", false):
 		return
 	var speed: float = _sample.get("speed", 0.0)
@@ -146,27 +130,9 @@ func _stop_effects(preserve_splash: bool = false) -> void:
 			(_effects[kind] as AudioStreamPlayer).stop()
 
 
-func _sync_music() -> void:
-	if not is_instance_valid(_music):
-		return
-	_music.volume_db = music_volume_db
-	_music.stream_paused = not music_enabled
-	if music_enabled and not _music.playing:
-		_music.play()
-
-
 func _player(player_name: String, stream: AudioStreamWAV) -> AudioStreamPlayer:
 	var player := AudioStreamPlayer.new()
 	player.name = player_name
 	player.stream = stream
 	add_child(player)
 	return player
-
-
-static func _install_input() -> void:
-	if not InputMap.has_action(&"music_toggle"):
-		InputMap.add_action(&"music_toggle")
-	var key := InputEventKey.new()
-	key.physical_keycode = KEY_M
-	if not InputMap.action_has_event(&"music_toggle", key):
-		InputMap.action_add_event(&"music_toggle", key)

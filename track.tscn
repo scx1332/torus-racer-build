@@ -61,7 +61,7 @@ fov = 78.0
 
 [node name="HUD" parent="." index="8" node_paths=PackedStringArray("race_manager")]
 phase_label = "COASTLINE RUN"
-location_hint = "R returns to checkpoint · M toggles music"
+location_hint = "R returns to checkpoint"
 panel_width = 430.0
 race_manager = NodePath("../RaceManager")
 

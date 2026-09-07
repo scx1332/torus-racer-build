@@ -1,5 +1,5 @@
 extends SceneTree
-## Validate cached PCM, audio event transitions, controls, and observer independence.
+## Validate cached PCM, audio event transitions, and observer independence.
 
 class TestWater extends Node3D:
 	signal water_entered(position: Vector3, impact_speed: float)
@@ -35,7 +35,6 @@ func _run() -> void:
 	var initial_angular := _body.angular_velocity
 	await create_timer(0.05).timeout
 	await _test_events()
-	_test_music_toggle()
 	_check(_body.transform == initial_transform and _body.linear_velocity == initial_linear
 		and _body.angular_velocity == initial_angular, "Audio events never alter rigid-body state")
 	_audio.queue_free()
@@ -49,7 +48,7 @@ func _run() -> void:
 
 func _test_streams() -> void:
 	var started := Time.get_ticks_msec()
-	var streams := [AudioSynth.music(), AudioSynth.rolling(), AudioSynth.cue(&"hop"),
+	var streams := [AudioSynth.rolling(), AudioSynth.cue(&"hop"),
 		AudioSynth.cue(&"landing"), AudioSynth.cue(&"impact"), AudioSynth.cue(&"splash")]
 	var total_bytes := 0
 	for stream: AudioStreamWAV in streams:
@@ -66,10 +65,9 @@ func _test_streams() -> void:
 		_check(pcm.decode_s16(0) == 0 and pcm.decode_s16(pcm.size() - 2) == 0, "Stream boundaries fade without clicks")
 		total_bytes += pcm.size()
 	_check(total_bytes < 1000000, "Cached audio occupies less than 1MB of PCM")
-	_check(streams[0] == AudioSynth.music() and streams[1] == AudioSynth.rolling()
-		and streams[2] == AudioSynth.cue(&"hop"), "Repeated requests reuse synthesized resources")
-	_check(streams[0].loop_mode == AudioStreamWAV.LOOP_FORWARD and streams[1].loop_mode == AudioStreamWAV.LOOP_FORWARD,
-		"Music and rolling streams loop")
+	_check(streams[0] == AudioSynth.rolling() and streams[1] == AudioSynth.cue(&"hop"),
+		"Repeated requests reuse synthesized resources")
+	_check(streams[0].loop_mode == AudioStreamWAV.LOOP_FORWARD, "The rolling stream loops")
 	print("AUDIO SYNTH bytes=%d generation_and_scan_ms=%d" % [total_bytes, Time.get_ticks_msec() - started])
 
 
@@ -136,22 +134,6 @@ func _test_events() -> void:
 	_check(_cues.is_empty(), "Muted SFX produce no playback events")
 	_audio.sfx_enabled = true
 	_body.reset_completed.emit()
-
-
-func _test_music_toggle() -> void:
-	var key := InputEventKey.new()
-	key.physical_keycode = KEY_M
-	key.pressed = true
-	_check(InputMap.action_has_event(&"music_toggle", key), "M is mapped to music toggle")
-	_check(_audio._music.playing and _audio.music_enabled, "Music starts enabled")
-	_audio._unhandled_input(key)
-	_check(not _audio.music_enabled and _audio._music.stream_paused and _audio.sfx_enabled,
-		"M pauses music while leaving SFX enabled")
-	_audio._unhandled_input(key)
-	_check(_audio.music_enabled and not _audio._music.stream_paused, "Second M resumes music")
-	_audio.music_volume_db = -28.0
-	_audio._process(0.1)
-	_check(is_equal_approx(_audio._music.volume_db, -28.0), "Music volume can be tuned live")
 
 
 func _sample(grounded: bool, velocity: Vector3, slip: float = 0.0) -> void:

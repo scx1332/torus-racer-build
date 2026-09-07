@@ -166,7 +166,6 @@ unassisted ring can fall over. Reset to recover at the last checkpoint.
 | Hop | Space | A / Cross |
 | Reset | R | Y / Triangle |
 | Physics debug | D | Back / Select |
-| Toggle music | M | — |
 
 Keyboard and gamepad work simultaneously. HUD hints follow the last meaningful
 input device, ignoring stick noise. Input Map actions are installed at startup
@@ -279,13 +278,11 @@ debug and clear on reset. In **Remote > ControlsLab > TorusEffects**, adjust
 the node has no effect on physics; its regression compares 720 simulation ticks
 with effects present versus absent, alongside particle/reset/debug probes.
 
-The coastal scene adds a short original, looping 96 BPM synth soundtrack and
-procedural rolling, hop, landing, collision and splash sounds. Rolling pitch
-and volume follow speed and slip; contact transitions trigger one-shot effects.
-Press **M** to pause/resume music without muting effects. Under
-**Remote > Track > GameAudio**, adjust `Music Volume Db` and `Sfx Volume Db`, or
-disable music and effects independently. Audio is synthesized once and cached
-(under 1 MB of PCM); no downloads or third-party recordings are used.
+The coastal scene adds procedural rolling, hop, landing, collision and splash
+sounds. Rolling pitch and volume follow speed and slip; contact transitions
+trigger one-shot effects. Under **Remote > Track > GameAudio**, adjust
+`Sfx Volume Db` or disable effects entirely. Audio is synthesized once and
+cached (well under 1 MB of PCM); no downloads or third-party recordings are used.
 
 `WaterEffects` draws pooled spray droplets, mist and expanding foam rings at
 the impact location, independent of the body's reset. It hides in physics debug;
@@ -389,7 +386,7 @@ front-facing road collisions, supported spawn and a real accelerated jump/landin
 Water regressions cover upright/leaned/flat falls, fast crossings, reset timing,
 manual cancellation, safe jumps, and identical trajectories with/without splash
 effects. Audio tests check bounded PCM, click-free stream endpoints, one-shot
-events, live volume, music toggle and independence from physics.
+events, live volume and independence from physics.
 Phase 4 adds solid-terrain rays and real grass landing/rolling, ordered/directional
 lap crossings, timer interpolation, reset exclusion, persistent best-lap loading,
 HUD formatting, and an integrated drive through the start, jump, checkpoint and
