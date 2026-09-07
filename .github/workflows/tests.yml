@@ -1,11 +1,21 @@
 name: Tests
 
 on:
+  # Pushes here only change the workflows themselves; the code under test always
+  # comes from the private source repository, so they test its default branch.
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag or commit of scx1332/torus-racer to test"
+        required: false
+        default: main
+        type: string
+  # Lets the private repository ask for a run: gh api repos/scx1332/torus-racer-build/dispatches
+  #   -f event_type=source-push -F client_payload[ref]=<sha>
+  repository_dispatch:
+    types: [source-push]
 
 permissions:
   contents: read
@@ -23,14 +33,34 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
+      # This repository holds no game code; it only runs CI for the private one.
+      SOURCE_REPOSITORY: scx1332/torus-racer
       # Keep aligned with mise.toml; the version check below rejects drift.
       GODOT_VERSION: "4.7.2"
 
     steps:
-      - name: Check out source
+      - name: Check the source deploy key is configured
+        env:
+          SOURCE_REPO_SSH_KEY: ${{ secrets.SOURCE_REPO_SSH_KEY }}
+        run: |
+          if [ -z "$SOURCE_REPO_SSH_KEY" ]; then
+            echo "SOURCE_REPO_SSH_KEY is not set. Add the private half of a read-only" >&2
+            echo "deploy key of $SOURCE_REPOSITORY as an Actions secret here." >&2
+            exit 1
+          fi
+
+      - name: Check out the private source repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          repository: ${{ env.SOURCE_REPOSITORY }}
+          ref: ${{ inputs.ref || github.event.client_payload.ref || 'main' }}
+          ssh-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
           persist-credentials: false
+
+      - name: Report the source commit
+        run: |
+          echo "Testing $SOURCE_REPOSITORY at $(git rev-parse HEAD)"
+          git --no-pager log -1 --format='%s'
 
       - name: Install runtime libraries
         # The stock Godot Linux build links against X11, GL and ALSA even when

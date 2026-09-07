@@ -87,22 +87,34 @@ check that the shortcut and game files are removed while saved lap times remain.
 ### GitHub Actions
 
 CI runs in the public sibling repository
-[`scx1332/torus-racer-build`](https://github.com/scx1332/torus-racer-build), which
-mirrors this tree. Both workflows are gated on
-`github.repository == 'scx1332/torus-racer-build'`, so the same tree can live in a
-private repository without spending Actions minutes there. Push to both remotes to
-get a CI result.
+[`scx1332/torus-racer-build`](https://github.com/scx1332/torus-racer-build), so this
+project can live in a private repository without spending Actions minutes there. That
+repository holds no game code: both workflows check out `scx1332/torus-racer` over SSH
+using `SOURCE_REPO_SSH_KEY`, an Actions secret holding the private half of a read-only
+deploy key of this repository. Revoke it from **Settings > Deploy keys** here if the
+build repository is ever compromised. The workflows are also gated on
+`github.repository == 'scx1332/torus-racer-build'`, so a copy of this tree never runs
+them anywhere else.
+
+Ask for a run of both workflows on the current commit with:
+
+```sh
+gh api repos/scx1332/torus-racer-build/dispatches \
+  -f event_type=source-push -F client_payload[ref]="$(git rev-parse HEAD)"
+```
+
+Each workflow also has **Actions > … > Run workflow**, whose `ref` input takes any
+branch, tag or commit of this repository and defaults to `main`. Pushes to the build
+repository itself only change the workflow files, so they run against `main` here.
 
 `.github/workflows/tests.yml` runs the whole `mise run validate` suite on
-`ubuntu-24.04` for pushes and pull requests against `main`, and supports
-**Actions > Tests > Run workflow**. It installs the pinned Godot with mise, plus the
-X11, GL and ALSA libraries the stock Godot Linux build links against even when it
-runs headless. A full run takes about four minutes.
+`ubuntu-24.04`. It installs the pinned Godot with mise, plus the X11, GL and ALSA
+libraries the stock Godot Linux build links against even when it runs headless. A full
+run takes about four minutes.
 
-`.github/workflows/windows-installer.yml` builds on `windows-2025` after pushes
-to `main`, and supports **Actions > Windows installer > Run workflow**. The manual
-form optionally overrides the MSI version (`X.Y.Z`); leave it empty to use the
-project default. It does not publish a GitHub Release or run on pull requests.
+`.github/workflows/windows-installer.yml` builds on `windows-2025`. Its manual form
+optionally overrides the MSI version (`X.Y.Z`); leave it empty to use the project
+default. It does not publish a GitHub Release.
 
 The workflow installs Godot and an isolated .NET SDK with mise, verifies their
 versions, downloads official matching Godot templates, checks the archive's pinned
@@ -119,8 +131,9 @@ Graphics, controller input and audible playback still need a manual Windows test
 Successful runs expose two downloadable artifacts: `TorusRacer-MSI-<run>` containing
 `TorusRacer.msi`, and `TorusRacer-Windows-<run>` containing the portable EXE + PCK.
 Build artifacts expire after 14 days; installer test logs are retained for 7 days
-even when the test fails. No signing certificate or additional repository secret
-is required. Actions are pinned to immutable commits and use a read-only token.
+even when the test fails. No signing certificate is required, and `SOURCE_REPO_SSH_KEY`
+is the only secret. Actions are pinned to immutable commits, the workflow's own token
+stays read-only, and neither credential is persisted into the checkout.
 
 ## Coastline circuit
 

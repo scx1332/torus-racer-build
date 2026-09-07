@@ -1,7 +1,9 @@
 #requires -Version 7.2
 # Destructive install/uninstall smoke test: only a disposable GitHub-hosted Windows runner.
-# Every child process is bounded here rather than by the workflow alone: a step
-# timeout does not reliably kill a process tree that still holds the output pipes.
+# Every child process is bounded here and has its output redirected to a file. A
+# child that inherits the runner's console pipes keeps them open, which defeats both
+# the workflow's step timeout and the runner's own cancellation; redirecting forces
+# UseShellExecute off so the process can actually be waited on and killed.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -38,13 +40,25 @@ function Start-BoundedProcess {
         [string] $ArgumentList,
         [string] $WorkingDirectory,
         [int] $TimeoutSeconds,
-        [string] $Description
+        [string] $Description,
+        [string] $OutputPrefix
     )
 
-    $parameters = @{ FilePath = $FilePath; ArgumentList = $ArgumentList; PassThru = $true }
+    $standardOutput = Join-Path $logDirectory "$OutputPrefix.out.txt"
+    $standardError = Join-Path $logDirectory "$OutputPrefix.err.txt"
+    $parameters = @{
+        FilePath = $FilePath
+        ArgumentList = $ArgumentList
+        PassThru = $true
+        # Redirection also switches Start-Process to UseShellExecute=false, so the
+        # child gets fresh handles instead of the runner's console pipes.
+        RedirectStandardOutput = $standardOutput
+        RedirectStandardError = $standardError
+    }
     if ($WorkingDirectory) {
         $parameters['WorkingDirectory'] = $WorkingDirectory
     }
+    Write-Host "[$(Get-Date -Format o)] starting $Description (limit ${TimeoutSeconds}s)"
     # Deliberately not -Wait: that also waits for descendants, and the msiexec
     # service lingers for minutes after an install, which hangs the whole step.
     # WaitForExit waits for this process only and takes a timeout.
@@ -56,9 +70,21 @@ function Start-BoundedProcess {
         catch {
             Write-Warning "Could not kill the timed-out process: $($_.Exception.Message)"
         }
+        Show-TestLogs
         throw "$Description did not finish within $TimeoutSeconds seconds."
     }
+    Write-Host "[$(Get-Date -Format o)] $Description exited with $($process.ExitCode)"
     return $process.ExitCode
+}
+
+function Show-TestLogs {
+    # Artifact upload cannot be relied on when a job is cancelled, so put the
+    # diagnostics that matter directly into the step output.
+    foreach ($logFile in Get-ChildItem -LiteralPath $logDirectory -File -ErrorAction SilentlyContinue) {
+        Write-Host "===== $($logFile.Name) (last 60 lines) ====="
+        Get-Content -LiteralPath $logFile.FullName -Tail 60 -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host $_ }
+    }
 }
 
 function Invoke-TestMsi {
@@ -70,7 +96,8 @@ function Invoke-TestMsi {
     # ArgumentList is one explicitly quoted Windows command line, including paths with spaces.
     $arguments = '{0} "{1}" /qn /norestart /L*v "{2}"' -f $Operation, $msiPath, $LogPath
     $exitCode = Start-BoundedProcess -FilePath $msiexecPath -ArgumentList $arguments `
-        -TimeoutSeconds 300 -Description "msiexec $Operation"
+        -TimeoutSeconds 240 -Description "msiexec $Operation" `
+        -OutputPrefix ("msiexec" + $Operation.TrimStart('/'))
     if ($exitCode -notin @(0, 3010)) {
         throw "msiexec $Operation failed with exit code $exitCode. See $LogPath"
     }
@@ -92,7 +119,8 @@ try {
     # The real game may read its normal user data; this test creates no fake lap records.
     $gameArguments = '--headless --log-file "{0}" --quit-after 120' -f $gameLog
     $gameExitCode = Start-BoundedProcess -FilePath $executablePath -ArgumentList $gameArguments `
-        -WorkingDirectory $installDirectory -TimeoutSeconds 180 -Description 'The installed game'
+        -WorkingDirectory $installDirectory -TimeoutSeconds 120 -Description 'The installed game' `
+        -OutputPrefix 'game'
     if ($gameExitCode -ne 0) {
         throw "The installed game exited with code $gameExitCode. See $gameLog"
     }
@@ -133,6 +161,7 @@ finally {
 }
 
 if ($null -ne $failure) {
+    Show-TestLogs
     throw $failure
 }
 Write-Host "WINDOWS INSTALLER SMOKE PASS. Logs: $logDirectory"

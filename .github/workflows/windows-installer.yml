@@ -1,14 +1,25 @@
 name: Windows installer
 
 on:
+  # Pushes here only change the workflows themselves; the code built always comes
+  # from the private source repository, so they build its default branch.
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
+      ref:
+        description: "Branch, tag or commit of scx1332/torus-racer to build"
+        required: false
+        default: main
+        type: string
       version:
         description: "Optional MSI version (X.Y.Z); empty uses the project default"
         required: false
         type: string
+  # Lets the private repository ask for a run: gh api repos/scx1332/torus-racer-build/dispatches
+  #   -f event_type=source-push -F client_payload[ref]=<sha>
+  repository_dispatch:
+    types: [source-push]
 
 permissions:
   contents: read
@@ -29,6 +40,8 @@ jobs:
         shell: pwsh
     env:
       MISE_DOTNET_ISOLATED: "true"
+      # This repository holds no game code; it only runs CI for the private one.
+      SOURCE_REPOSITORY: scx1332/torus-racer
       # Keep aligned with mise.toml; the version check below rejects drift.
       GODOT_VERSION: "4.7.2"
       GODOT_TEMPLATES_SHA256: f298490b8d44d934be425a5a65a51bf15f422428b229a06a6e11d9ffea248011
@@ -36,10 +49,26 @@ jobs:
       ProductVersion: ${{ inputs.version }}
 
     steps:
-      - name: Check out source
+      - name: Check the source deploy key is configured
+        env:
+          SOURCE_REPO_SSH_KEY: ${{ secrets.SOURCE_REPO_SSH_KEY }}
+        run: |
+          if (-not $env:SOURCE_REPO_SSH_KEY) {
+            throw "SOURCE_REPO_SSH_KEY is not set. Add the private half of a read-only deploy key of $env:SOURCE_REPOSITORY as an Actions secret of this repository."
+          }
+
+      - name: Check out the private source repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          repository: ${{ env.SOURCE_REPOSITORY }}
+          ref: ${{ inputs.ref || github.event.client_payload.ref || 'main' }}
+          ssh-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
           persist-credentials: false
+
+      - name: Report the source commit
+        run: |
+          Write-Host "Building $env:SOURCE_REPOSITORY at $(git rev-parse HEAD)"
+          git --no-pager log -1 --format='%s'
 
       - name: Install Godot and .NET with mise
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
@@ -85,9 +114,10 @@ jobs:
         run: mise run build-installer
 
       - name: Test install, launch and uninstall
-        # A backstop only. The script bounds msiexec and the game launch itself,
-        # because a step timeout cannot be relied on to kill a stuck process tree.
-        timeout-minutes: 20
+        # A backstop only. The script bounds msiexec and the game launch itself
+        # (240s + 120s + 240s at worst) and redirects their output, because a step
+        # timeout cannot cancel a child that still holds the runner's console pipes.
+        timeout-minutes: 15
         run: ./tools/test_windows_installer.ps1
 
       - name: Upload MSI
