@@ -1,0 +1,64 @@
+[tools]
+godot = "4.7.2"
+dotnet = { version = "10.0.303", install_env = { DOTNET_CLI_TELEMETRY_OPTOUT = "1" } }
+
+[env]
+DOTNET_CLI_TELEMETRY_OPTOUT = "1"
+DOTNET_NOLOGO = "1"
+
+[tasks.import]
+description = "Import the Godot project and check scripts"
+run = "godot --headless --path . --editor --import"
+
+[tasks.validate]
+description = "Check physics, input controls, and presentation independence"
+depends = ["import"]
+run = [
+  "godot --headless --path . --script res://tests/physics_validation.gd -- --manual",
+  "godot --headless --path . --script res://tests/physics_validation.gd -- --manual --no-nudge",
+  "godot --headless --path . --script res://tests/gyro_conservation.gd -- --manual",
+  "godot --headless --path . --script res://tests/gyro_forced.gd",
+  "godot --headless --path . --script res://tests/input_mapping.gd",
+  "godot --headless --path . --script res://tests/controls_physics.gd",
+  "godot --headless --path . --script res://tests/bank_pivot.gd",
+  "godot --headless --path . --script res://tests/rolling_steering.gd",
+  "godot --headless --path . --script res://tests/bank_steering.gd",
+  "godot --headless --path . --script res://tests/steering_lifecycle.gd",
+  "godot --headless --path . --script res://tests/debug_invariance.gd",
+  "godot --headless --path . --script res://tests/debug_invariance.gd -- --bank-controller",
+  "godot --headless --path . --script res://tests/effects_invariance.gd",
+  "godot --headless --path . --script res://tests/chase_camera.gd",
+  "godot --headless --path . --script res://tests/track_validation.gd",
+  "godot --headless --path . --script res://tests/water_hazard.gd",
+  "godot --headless --path . --script res://tests/water_effects.gd",
+  "godot --headless --path . --script res://tests/audio_feedback.gd",
+  "godot --headless --path . --script res://tests/terrain_collision.gd",
+  "godot --headless --path . --script res://tests/race_manager.gd",
+  "godot --headless --path . --script res://tests/race_hud.gd",
+  "godot --headless --path . --script res://tests/race_scene.gd",
+]
+
+[tasks.play]
+description = "Race on the Coastline Run circuit"
+run = "godot --path ."
+
+[tasks.build-windows]
+description = "Export a Windows x86_64 release (requires matching Godot export templates)"
+depends = ["import"]
+run = [
+  "godot --headless --path . --script tools/prepare_windows_export.gd",
+  "godot --headless --path . --export-release \"Windows Desktop\" build/windows/TorusRacer.exe",
+]
+
+[tasks.build-installer]
+description = "Package an existing Windows export as a WiX MSI (Windows host)"
+# The project owner explicitly accepted WiX 7 OSMF terms for this build.
+run = "dotnet build installer/TorusRacer.wixproj --configuration Release -p:AcceptEula=wix7"
+
+[tasks.controls-lab]
+description = "Run the flat Phase 2 control lab"
+run = "godot --path . --scene res://controls_lab.tscn"
+
+[tasks.physics-lab]
+description = "Run the original Phase 1 automatic experiment"
+run = "godot --path . --scene res://physics_validation.tscn"

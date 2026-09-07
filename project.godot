@@ -1,0 +1,23 @@
+; Torus Racer — Coastline Run, with the original physics/control labs preserved.
+config_version=5
+
+[application]
+config/name="Torus Racer"
+run/main_scene="res://track.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+
+[physics]
+3d/physics_engine="Jolt Physics"
+common/physics_ticks_per_second=240
+common/max_physics_steps_per_frame=32
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+anti_aliasing/quality/msaa_3d=2
+environment/defaults/default_clear_color=Color(0.055, 0.075, 0.11, 1)

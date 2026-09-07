@@ -1,0 +1,113 @@
+name: Windows installer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Optional MSI version (X.Y.Z); empty uses the project default"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      MISE_DOTNET_ISOLATED: "true"
+      # Keep aligned with mise.toml; the version check below rejects drift.
+      GODOT_VERSION: "4.7.2"
+      GODOT_TEMPLATES_SHA256: f298490b8d44d934be425a5a65a51bf15f422428b229a06a6e11d9ffea248011
+      # Pass user input as data, never interpolate it into shell source.
+      ProductVersion: ${{ inputs.version }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Godot and .NET with mise
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: "2026.9.1"
+          install_args: godot dotnet
+
+      - name: Check tool and package versions
+        id: tools
+        run: |
+          $godotVersion = (mise exec -- godot --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or !$godotVersion.StartsWith("$env:GODOT_VERSION.stable.")) {
+            throw "Godot does not match the pinned export templates: $godotVersion"
+          }
+          $sdkVersion = (mise exec -- dotnet --version | Out-String).Trim()
+          $expectedSdk = (Get-Content global.json -Raw | ConvertFrom-Json).sdk.version
+          if ($LASTEXITCODE -ne 0 -or $sdkVersion -ne $expectedSdk) {
+            throw "mise did not select the pinned .NET SDK: $sdkVersion"
+          }
+          if ($env:ProductVersion -and $env:ProductVersion -notmatch '^\d+\.\d+\.\d+$') {
+            throw 'The MSI version must contain exactly three numeric fields: X.Y.Z.'
+          }
+          Write-Host "Godot: $godotVersion; .NET: $sdkVersion"
+          $templates = Join-Path ([Environment]::GetFolderPath('ApplicationData')) "Godot/export_templates/$env:GODOT_VERSION.stable"
+          "templates-dir=$templates" >> $env:GITHUB_OUTPUT
+
+      - name: Cache verified Windows export templates
+        id: templates
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.tools.outputs.templates-dir }}
+          key: windows-godot-templates-v1-${{ env.GODOT_VERSION }}-${{ env.GODOT_TEMPLATES_SHA256 }}
+
+      - name: Download and verify export templates
+        if: steps.templates.outputs.cache-hit != 'true'
+        run: ./tools/install_windows_templates.ps1 -Version $env:GODOT_VERSION -Sha256 $env:GODOT_TEMPLATES_SHA256
+
+      - name: Export Windows release
+        run: mise run build-windows
+
+      - name: Build WiX MSI
+        # Project owner explicitly accepted the WiX 7 OSMF terms.
+        run: mise run build-installer
+
+      - name: Test install, launch and uninstall
+        timeout-minutes: 5
+        run: ./tools/test_windows_installer.ps1
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: TorusRacer-MSI-${{ github.run_number }}
+          path: build/installer/TorusRacer.msi
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload portable Windows game
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: TorusRacer-Windows-${{ github.run_number }}
+          path: |
+            build/windows/TorusRacer.exe
+            build/windows/TorusRacer.pck
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload installer test logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: TorusRacer-installer-logs-${{ github.run_number }}
+          path: build/installer-test/*.log
+          if-no-files-found: ignore
+          retention-days: 7

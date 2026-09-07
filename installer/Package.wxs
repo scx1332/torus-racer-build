@@ -1,0 +1,46 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <!-- Keep this UpgradeCode stable across versions so upgrades replace the old game. -->
+  <Package Name="Torus Racer" Manufacturer="Torus Racer"
+           Version="$(var.ProductVersion)" Language="1033" Scope="perUser"
+           UpgradeCode="51b42056-c4ce-477d-b6df-cd0dc3da0554">
+    <!-- Rebuilt development versions replace each other; failed upgrades roll back. -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes" Schedule="afterInstallInitialize"
+                  DowngradeErrorMessage="A newer version of Torus Racer is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Only the exported game is installed. Godot's separate user data is never removed. -->
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="INSTALLFOLDER" Name="TorusRacer">
+        <Component Id="GameExecutable" Guid="*">
+          <File Id="TorusExecutable" Source="$(var.PayloadDir)/TorusRacer.exe" KeyPath="no" />
+          <RegistryValue Root="HKCU" Key="Software\TorusRacer\Installer" Name="Executable"
+                         Type="integer" Value="1" KeyPath="yes" />
+          <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+        </Component>
+        <Component Id="GameData" Guid="*">
+          <File Id="TorusGameData" Source="$(var.PayloadDir)/TorusRacer.pck" KeyPath="no" />
+          <RegistryValue Root="HKCU" Key="Software\TorusRacer\Installer" Name="GameData"
+                         Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="GameProgramsFolder" Name="Torus Racer">
+        <Component Id="GameShortcut" Guid="*">
+          <Shortcut Id="StartMenuShortcut" Name="Torus Racer" Target="[#TorusExecutable]"
+                    WorkingDirectory="INSTALLFOLDER" Advertise="no" />
+          <RegistryValue Root="HKCU" Key="Software\TorusRacer\Installer" Name="StartMenuShortcut"
+                         Type="integer" Value="1" KeyPath="yes" />
+          <RemoveFolder Id="RemoveGameProgramsFolder" On="uninstall" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="Game" Title="Torus Racer" Level="1">
+      <ComponentRef Id="GameExecutable" />
+      <ComponentRef Id="GameData" />
+      <ComponentRef Id="GameShortcut" />
+    </Feature>
+  </Package>
+</Wix>

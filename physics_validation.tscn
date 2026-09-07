@@ -1,0 +1,74 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://torus_body.gd" id="1_body"]
+[ext_resource type="Script" path="res://chase_camera.gd" id="2_camera"]
+[ext_resource type="Shader" path="res://materials/ground.gdshader" id="3_grid"]
+
+[sub_resource type="Environment" id="Environment_lab"]
+background_mode = 1
+background_color = Color(0.055, 0.075, 0.11, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.75, 0.83, 1, 1)
+ambient_light_energy = 0.6
+tonemap_mode = 2
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_ground"]
+friction = 0.8
+
+[sub_resource type="BoxShape3D" id="BoxShape_ground"]
+size = Vector3(1000, 1, 1000)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_grid"]
+shader = ExtResource("3_grid")
+
+[sub_resource type="BoxMesh" id="BoxMesh_ground"]
+size = Vector3(1000, 1, 1000)
+material = SubResource("ShaderMaterial_grid")
+
+[sub_resource type="LabelSettings" id="LabelSettings_note"]
+font_size = 18
+font_color = Color(0.9, 0.94, 1, 1)
+outline_size = 6
+outline_color = Color(0.025, 0.035, 0.055, 1)
+
+[node name="PhysicsValidation" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_lab")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-55, -30, 0)
+light_color = Color(1, 0.91, 0.8, 1)
+light_energy = 1.4
+shadow_enabled = true
+directional_shadow_max_distance = 80.0
+
+[node name="Ground" type="StaticBody3D" parent="."]
+position = Vector3(0, -0.5, 0)
+physics_material_override = SubResource("PhysicsMaterial_ground")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+shape = SubResource("BoxShape_ground")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
+mesh = SubResource("BoxMesh_ground")
+
+[node name="Torus" type="RigidBody3D" parent="."]
+position = Vector3(0, 1.28, 0)
+script = ExtResource("1_body")
+
+[node name="ChaseCamera" type="Camera3D" parent="." node_paths=PackedStringArray("target")]
+current = true
+far = 1200.0
+script = ExtResource("2_camera")
+target = NodePath("../Torus")
+
+[node name="ExperimentNote" type="CanvasLayer" parent="."]
+
+[node name="Label" type="Label" parent="ExperimentNote"]
+offset_left = 24.0
+offset_top = 20.0
+offset_right = 950.0
+offset_bottom = 100.0
+text = "TORUS RACER  /  PHASE 1\nFree rolling body · automatic lean nudge at 2 seconds\nEdit Torus experiment settings, then restart with F8 / F6."
+label_settings = SubResource("LabelSettings_note")

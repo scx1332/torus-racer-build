@@ -1,0 +1,6 @@
+.godot/
+*.log
+/build/
+/dist/
+/installer/bin/
+/installer/obj/

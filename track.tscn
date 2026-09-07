@@ -1,0 +1,104 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="PackedScene" path="res://controls_lab.tscn" id="1_lab"]
+[ext_resource type="Script" path="res://track_builder.gd" id="2_road"]
+[ext_resource type="Script" path="res://track_scenery.gd" id="3_scenery"]
+[ext_resource type="Script" path="res://track_props.gd" id="4_props"]
+[ext_resource type="Script" path="res://water_hazard.gd" id="5_water"]
+[ext_resource type="Script" path="res://water_effects.gd" id="6_splash"]
+[ext_resource type="Script" path="res://game_audio.gd" id="7_audio"]
+[ext_resource type="Script" path="res://race_manager.gd" id="8_race"]
+[ext_resource type="Script" path="res://checkpoint_markers.gd" id="9_markers"]
+
+[sub_resource type="ProceduralSkyMaterial" id="SkyMaterial_coast"]
+sky_top_color = Color(0.10, 0.38, 0.58, 1)
+sky_horizon_color = Color(0.64, 0.76, 0.79, 1)
+ground_bottom_color = Color(0.18, 0.39, 0.43, 1)
+ground_horizon_color = Color(0.34, 0.47, 0.43, 1)
+sky_curve = 0.22
+sun_angle_max = 8.0
+
+[sub_resource type="Sky" id="Sky_coast"]
+sky_material = SubResource("SkyMaterial_coast")
+
+[sub_resource type="Environment" id="Environment_coast"]
+background_mode = 2
+sky = SubResource("Sky_coast")
+ambient_light_energy = 0.35
+tonemap_mode = 2
+fog_enabled = true
+fog_light_color = Color(0.78, 0.83, 0.76, 1)
+fog_density = 0.0005
+fog_sky_affect = 0.1
+
+[sub_resource type="BoxShape3D" id="Shape_safety"]
+size = Vector3(1100, 1, 1100)
+
+[node name="Track" instance=ExtResource("1_lab")]
+
+[node name="WorldEnvironment" parent="." index="0"]
+environment = SubResource("Environment_coast")
+
+[node name="Sun" parent="." index="1"]
+rotation_degrees = Vector3(-34, -42, 0)
+light_color = Color(1, 0.86, 0.65, 1)
+light_energy = 1.1
+directional_shadow_max_distance = 160.0
+
+[node name="Ground" parent="." index="2"]
+visible = false
+collision_layer = 0
+collision_mask = 0
+
+[node name="Torus" parent="." index="3" node_paths=PackedStringArray("water_hazard")]
+position = Vector3(100, 9.28, -65)
+water_hazard = NodePath("../WaterHazard")
+
+[node name="ChaseCamera" parent="." index="4"]
+follow_distance = 8.0
+follow_height = 4.0
+fov = 78.0
+
+[node name="HUD" parent="." index="8" node_paths=PackedStringArray("race_manager")]
+phase_label = "COASTLINE RUN"
+location_hint = "R returns to checkpoint · M toggles music"
+panel_width = 430.0
+race_manager = NodePath("../RaceManager")
+
+[node name="Road" type="StaticBody3D" parent="."]
+script = ExtResource("2_road")
+
+[node name="Scenery" type="Node3D" parent="."]
+script = ExtResource("3_scenery")
+
+[node name="TrackProps" type="Node3D" parent="."]
+script = ExtResource("4_props")
+
+[node name="WaterHazard" type="Node3D" parent="."]
+position = Vector3(0, -4, 0)
+script = ExtResource("5_water")
+surface_path = NodePath("../Scenery/Ocean")
+
+[node name="WaterEffects" type="Node3D" parent="." node_paths=PackedStringArray("hazard", "debug_view")]
+script = ExtResource("6_splash")
+hazard = NodePath("../WaterHazard")
+debug_view = NodePath("../TorusDebug")
+
+[node name="GameAudio" type="Node" parent="." node_paths=PackedStringArray("target", "water_hazard")]
+script = ExtResource("7_audio")
+target = NodePath("../Torus")
+water_hazard = NodePath("../WaterHazard")
+
+[node name="RaceManager" type="Node" parent="." node_paths=PackedStringArray("target")]
+script = ExtResource("8_race")
+target = NodePath("../Torus")
+
+[node name="CheckpointMarkers" type="Node3D" parent="." node_paths=PackedStringArray("race_manager")]
+script = ExtResource("9_markers")
+race_manager = NodePath("../RaceManager")
+
+[node name="SafetyFloor" type="StaticBody3D" parent="."]
+position = Vector3(0, -18.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SafetyFloor"]
+shape = SubResource("Shape_safety")

@@ -1,0 +1,24 @@
+<Project Sdk="WixToolset.Sdk/7.0.0" InitialTargets="ValidateInstallerInputs">
+  <PropertyGroup>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">0.4.0</ProductVersion>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <OutputType>Package</OutputType>
+    <OutputName>TorusRacer</OutputName>
+    <OutputPath>$(MSBuildProjectDirectory)/../build/installer/</OutputPath>
+    <PayloadDir>$(MSBuildProjectDirectory)/../build/windows</PayloadDir>
+    <DefineConstants>$(DefineConstants);ProductVersion=$(ProductVersion);PayloadDir=$(PayloadDir)</DefineConstants>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- The mise build task supplies the project owner's explicit WiX 7 EULA acceptance. -->
+  <Target Name="ValidateInstallerInputs">
+    <Error Condition="!$([MSBuild]::IsOSPlatform('Windows'))"
+           Text="Building the WiX MSI requires Windows: WiX uses native wixnative.exe and msi.dll. Export the game here, then build this project on Windows or a Windows CI runner." />
+    <Error Condition="'$(InstallerPlatform)' != 'x64'"
+           Text="This installer packages the Windows x86_64 Godot export; InstallerPlatform must be x64." />
+    <Error Condition="!Exists('$(PayloadDir)/TorusRacer.exe')"
+           Text="Missing build/windows/TorusRacer.exe. Export the Windows release game before building the installer." />
+    <Error Condition="!Exists('$(PayloadDir)/TorusRacer.pck')"
+           Text="Missing build/windows/TorusRacer.pck. Export with embedded PCK disabled and keep the EXE and PCK together." />
+  </Target>
+</Project>
