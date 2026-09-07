@@ -86,6 +86,19 @@ check that the shortcut and game files are removed while saved lap times remain.
 
 ### GitHub Actions
 
+CI runs in the public sibling repository
+[`scx1332/torus-racer-build`](https://github.com/scx1332/torus-racer-build), which
+mirrors this tree. Both workflows are gated on
+`github.repository == 'scx1332/torus-racer-build'`, so the same tree can live in a
+private repository without spending Actions minutes there. Push to both remotes to
+get a CI result.
+
+`.github/workflows/tests.yml` runs the whole `mise run validate` suite on
+`ubuntu-24.04` for pushes and pull requests against `main`, and supports
+**Actions > Tests > Run workflow**. It installs the pinned Godot with mise, plus the
+X11, GL and ALSA libraries the stock Godot Linux build links against even when it
+runs headless. A full run takes about four minutes.
+
 `.github/workflows/windows-installer.yml` builds on `windows-2025` after pushes
 to `main`, and supports **Actions > Windows installer > Run workflow**. The manual
 form optionally overrides the MSI version (`X.Y.Z`); leave it empty to use the
