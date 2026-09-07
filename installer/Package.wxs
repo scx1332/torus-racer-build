@@ -31,7 +31,9 @@
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="GameProgramsFolder" Name="Torus Racer">
         <Component Id="GameShortcut" Guid="*">
-          <Shortcut Id="StartMenuShortcut" Name="Torus Racer" Target="[#TorusExecutable]"
+          <!-- Target the installed path, not the file key: a shortcut that references a
+               file from another component trips ICE69. -->
+          <Shortcut Id="StartMenuShortcut" Name="Torus Racer" Target="[INSTALLFOLDER]TorusRacer.exe"
                     WorkingDirectory="INSTALLFOLDER" Advertise="no" />
           <RegistryValue Root="HKCU" Key="Software\TorusRacer\Installer" Name="StartMenuShortcut"
                          Type="integer" Value="1" KeyPath="yes" />

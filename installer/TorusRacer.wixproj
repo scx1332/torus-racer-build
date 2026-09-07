@@ -8,6 +8,12 @@
     <PayloadDir>$(MSBuildProjectDirectory)/../build/windows</PayloadDir>
     <DefineConstants>$(DefineConstants);ProductVersion=$(ProductVersion);PayloadDir=$(PayloadDir)</DefineConstants>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- ICE61 fires because MajorUpgrade allows same-version upgrades, which this
+         project wants so rebuilt development versions replace each other. ICE91
+         objects to installing files under a per-user directory, which is exactly
+         what Scope="perUser" asks for. Both are by design; every other ICE check
+         still runs and still fails the build. -->
+    <SuppressIces>ICE61;ICE91</SuppressIces>
   </PropertyGroup>
 
   <!-- The mise build task supplies the project owner's explicit WiX 7 EULA acceptance. -->
