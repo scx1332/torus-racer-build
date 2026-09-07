@@ -11,13 +11,16 @@
     <!-- Only the exported game is installed. Godot's separate user data is never removed. -->
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="INSTALLFOLDER" Name="TorusRacer">
-        <Component Id="GameExecutable" Guid="*">
+        <!-- A component holding both a file and a registry keypath cannot use an
+             auto-generated guid, so these two carry fixed ones. Keep them stable
+             across versions or upgrades will orphan the installed payload. -->
+        <Component Id="GameExecutable" Guid="9A8EA1EB-9A0D-5DA0-A7BE-0DF3C4AED332">
           <File Id="TorusExecutable" Source="$(var.PayloadDir)/TorusRacer.exe" KeyPath="no" />
           <RegistryValue Root="HKCU" Key="Software\TorusRacer\Installer" Name="Executable"
                          Type="integer" Value="1" KeyPath="yes" />
           <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
         </Component>
-        <Component Id="GameData" Guid="*">
+        <Component Id="GameData" Guid="6788A4FD-3F12-541E-BCDE-3C79312E08DB">
           <File Id="TorusGameData" Source="$(var.PayloadDir)/TorusRacer.pck" KeyPath="no" />
           <RegistryValue Root="HKCU" Key="Software\TorusRacer\Installer" Name="GameData"
                          Type="integer" Value="1" KeyPath="yes" />
